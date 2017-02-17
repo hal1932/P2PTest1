@@ -1,7 +1,7 @@
 # encoding: utf-8
-import config
 import http_request
 import log
+import query
 
 import threading
 import functools
@@ -59,7 +59,7 @@ class ClientWatcher(object):
             if len(clients) > 0:
 
                 def _get_query_url(client):
-                    return 'http://{}/{}'.format(client.address, config.QUERY_IS_CLIENT_ALIVE)
+                    return 'http://{}/{}'.format(client.address, query.IS_CLIENT_ALIVE)
 
                 urls = [_get_query_url(client) for client in clients]
                 results = http_request.gets_sync(urls)

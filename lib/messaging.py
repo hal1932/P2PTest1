@@ -1,5 +1,5 @@
 # encoding: utf-8
-import config
+import p2p_config
 import http_request
 import log
 
@@ -8,8 +8,23 @@ import json
 import functools
 
 
-def publish_once_sync(topic, data):
-    url = 'http://{}/pub?topic={}'.format(config.NSQD_HTTP_ADDRESS, topic)
+class NsqdConfig(object):
+
+    @property
+    def http_address(self):
+        return self.__http_address
+
+    @property
+    def tcp_addresses(self):
+        return self.__tcp_addresses
+
+    def __init__(self, http_address, tcp_addresses):
+        self.__http_address = http_address
+        self.__tcp_addresses = tcp_addresses
+
+
+def publish_once_sync(nsqd_config, topic, data):
+    url = 'http://{}/pub?topic={}'.format(nsqd_config.http_address, topic)
     json_data = json.dumps(data)
 
     code, content = http_request.post_sync(url, json_data)
@@ -20,7 +35,7 @@ def publish_once_sync(topic, data):
         return False
 
 
-def create_subscriber(topic, channel, on_received_message):
+def create_subscriber(nsqd_config, topic, channel, on_received_message):
     def _message_handler(message, callback):
         message.enable_async()
         data = message.body
@@ -31,7 +46,7 @@ def create_subscriber(topic, channel, on_received_message):
         topic=topic,
         channel=channel,
         message_handler=functools.partial(_message_handler, callback=on_received_message),
-        nsqd_tcp_addresses=config.NSQD_TCP_ADDRESSES,
+        nsqd_tcp_addresses=nsqd_config.tcp_addresses,
     )
 
 

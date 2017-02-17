@@ -1,5 +1,11 @@
 # encoding: utf-8
-from lib import *
+import p2p_config
+import node
+import http_server
+import http_request
+import messaging
+import query
+import log
 
 import random
 import functools
@@ -7,10 +13,22 @@ import json
 import threading
 
 
-class Peer(node.NodeBase):
+class PeerConfig(object):
 
-    def __init__(self):
-        super(Peer, self).__init__()
+    @property
+    def nsqd_config(self):
+        return self.__nsqd_config
+
+    def __init__(self, nsqd_config):
+        self.__nsqd_config = nsqd_config
+
+
+class PeerNode(node.NodeBase):
+
+    def __init__(self, config, run_impl):
+        super(PeerNode, self).__init__()
+        self.__config = config
+        self.__run_impl = run_impl
         self.__server_http_address = None
         self.__connection_start = threading.Event()
 
@@ -27,19 +45,9 @@ class Peer(node.NodeBase):
         self.__connection_start.wait()
         log.write('start connection to {}'.format(self.__server_http_address))
 
-        response = self.__send_to_index_server('/clients', target='all')
-        print(response)
+        self.__run_impl(server=server)
 
-        response = self.__send_to_index_server('/clients')
-        print(response)
-
-        import time
-        time.sleep(3)
-
-        server.stop()
-
-    def __send_to_index_server(self, function, **params):
-        print(params)
+    def send_to_index_server(self, function, **params):
         url = '{}{}'.format(self.__server_http_address, function)
         params['sender'] = self.address
         return http_request.get_sync(url, params)
@@ -50,10 +58,10 @@ class Peer(node.NodeBase):
     def __register_as_client(self):
         data = {
             'host': self.host,
-            'port': random.randint(config.AVAILABLE_PORT_BASE, config.AVAILABLE_CONTENT_PORT_MAX),
+            'port': random.randint(p2p_config.AVAILABLE_PORT_BASE, p2p_config.AVAILABLE_CONTENT_PORT_MAX),
             'user': self.user,
         }
-        if not messaging.publish_once_sync(config.TOPIC_REGISTER_CLIENT, data):
+        if not messaging.publish_once_sync(self.__config.nsqd_config, p2p_config.TOPIC_REGISTER_CLIENT, data):
             log.error_exit(1, 'failed to request the registration as a client')
 
         log.write('send registration request: {}:{} {}'.format(
@@ -64,11 +72,11 @@ class Peer(node.NodeBase):
     def __on_request_get(handler, instance):
         paths, params = handler.parse_url()
 
-        if paths[0] == config.QUERY_REGISTER_CLIENT:
-            if paths[1] == config.QUERY_SUCCESS:
+        if paths[0] == query.REGISTER_CLIENT:
+            if paths[1] == query.SUCCESS:
                 log.write('participate in the topology')
             else:
-                error = json.loads(paths[2])
+                error = params['message']
                 log.error_exit(1, 'failed to participate in the topology: {}'.format(error))
 
             handler.send_response(http_request.STATUS_OK)
@@ -77,10 +85,6 @@ class Peer(node.NodeBase):
             instance.__set_server_address(params['host'][0], params['port'][0])
             instance.__connection_start.set()
 
-        elif paths[0] == config.QUERY_IS_CLIENT_ALIVE:
+        elif paths[0] == query.IS_CLIENT_ALIVE:
             handler.send_response(http_request.STATUS_OK)
             handler.end_headers()
-
-
-if __name__ == '__main__':
-    Peer().run()

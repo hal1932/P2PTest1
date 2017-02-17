@@ -22,11 +22,12 @@ def get_sync(url, params=None, timeout=None, ignore_error=False):
 
     try:
         response = requests.get(url, **kwargs)
+        return response.status_code, response.text
     except:
         if not ignore_error:
             raise
 
-    return response.status_code, response.text
+    return 0, ''
 
 
 def gets_sync(urls, params=None, timeout=None):

@@ -1,5 +1,11 @@
 # encoding: utf-8
-from lib import *
+import p2p_config
+import node
+import messaging
+import http_request
+import log
+import util
+import query
 
 import threading
 import functools
@@ -12,7 +18,8 @@ class ClientPool(object):
     def clients(self):
         return self.__clients
 
-    def __init__(self, host, port):
+    def __init__(self, config, host, port):
+        self.__config = config
         self.__host = host
         self.__port = port
 
@@ -27,7 +34,8 @@ class ClientPool(object):
 
     def run(self):
         messaging.create_subscriber(
-            config.TOPIC_REGISTER_CLIENT,
+            self.__config.nsqd_config,
+            p2p_config.TOPIC_REGISTER_CLIENT,
             channel='channel0',
             on_received_message=functools.partial(
                 self.__on_received_registration_request,
@@ -63,13 +71,19 @@ class ClientPool(object):
 
     def __test_register_client(self, new_client):
         new_address = new_client.address
+
         if util.exists(self.__clients, lambda x: x.address == new_address):
             return 'duplicated client address: {}'.format(new_address)
+
+        if self.__config.max_peer_count is not None:
+            if len(self.__clients) >= self.__config.max_peer_count:
+                return 'exceeding max peer count {}'.format(self.__config.max_peer_count)
+
         return None
 
     def __send_register_notification(self, new_client):
         url = 'http://{}/{}/{}'.format(
-            new_client.address, config.QUERY_REGISTER_CLIENT, config.QUERY_SUCCESS)
+            new_client.address, query.REGISTER_CLIENT, query.SUCCESS)
 
         data = {
             'host': self.__host,
@@ -97,5 +111,5 @@ class ClientPool(object):
 
     def __send_error(self, client, msg):
         url = 'http://{}/{}/{}?message={}'.format(
-            client.address, config.QUERY_REGISTER_CLIENT, config.QUERY_ERROR, msg)
+            client.address, query.REGISTER_CLIENT, query.ERROR, msg)
         http_request.get_sync(url, ignore_error=True)
