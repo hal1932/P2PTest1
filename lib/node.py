@@ -36,5 +36,9 @@ class NodeBase(object):
             'user': self.user,
         }
 
+    @staticmethod
+    def from_dict(dic):
+        return NodeBase(dic['host'], dic['port'], dic['user'])
+
     def update_port(self, port):
         self.__port = port

@@ -50,7 +50,9 @@ class PeerNode(node.NodeBase):
     def send_to_index_server(self, function, **params):
         url = '{}{}'.format(self.__server_http_address, function)
         params['sender'] = self.address
-        return http_request.get_sync(url, params)
+
+        status, content = http_request.get_sync(url, params)
+        return status, json.loads(content)
 
     def __set_server_address(self, host, port):
         self.__server_http_address = 'http://{}:{}'.format(host, port)

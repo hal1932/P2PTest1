@@ -4,6 +4,7 @@ import config
 from lib import *
 
 import time
+import json
 
 
 class PeerTest(peer_node.PeerNode):
@@ -12,13 +13,19 @@ class PeerTest(peer_node.PeerNode):
         super(PeerTest, self).__init__(config.PEER_CONFIG, self.__run_impl)
 
     def __run_impl(self, server):
-        response = self.send_to_index_server('/clients', target='all')
-        print(response)
+        status, content = self.send_to_index_server('/clients', target='all')
+        if status == http_request.STATUS_OK:
+            for item in content:
+                client = node.NodeBase.from_dict(item)
+                print(client.address)
 
-        response = self.send_to_index_server('/clients')
-        print(response)
+        status, content = self.send_to_index_server('/clients')
+        if status == http_request.STATUS_OK:
+            for item in content:
+                client = node.NodeBase.from_dict(item)
+                print(client.address)
 
-        time.sleep(3)
+        time.sleep(10)
 
         server.stop()
 
